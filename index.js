@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.3.1';
-const BUILD = '2025.01.17-REAL-TAX-PERSISTENCE';
+const VERSION = 'v2.4.0';
+const BUILD = '2025.01.17-PROPER-TAX-TABLE';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -566,7 +566,7 @@ export default {
           }
         }
 
-        // USER TAX SETTINGS endpoints - Store as JSON in sessions table
+        // USER TAX SETTINGS endpoints - Proper table structure
         if (apiPath === '/users/tax-settings' && request.method === 'GET') {
           const sessionId = getSessionFromRequest(request);
           const session = await validateSession(sessionId, env);
@@ -576,14 +576,19 @@ export default {
           }
 
           try {
-            // Try to get tax settings from session or user record
-            const userRecord = await env.DB.prepare(`
-              SELECT id, tax_settings FROM users WHERE id = ?
+            // Get tax settings from dedicated table
+            const settings = await env.DB.prepare(`
+              SELECT filing_status, income_bracket, tax_year, updated_at
+              FROM user_tax_settings WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1
             `).bind(session.user_id).first();
 
-            if (userRecord && userRecord.tax_settings) {
-              const settings = JSON.parse(userRecord.tax_settings);
-              return successResponse(settings);
+            if (settings) {
+              return successResponse({
+                filing_status: settings.filing_status,
+                income_bracket: settings.income_bracket,
+                tax_year: settings.tax_year,
+                last_updated: settings.updated_at
+              });
             } else {
               // Return defaults if no saved settings
               return successResponse({
@@ -593,7 +598,7 @@ export default {
               });
             }
           } catch (error) {
-            console.log('Tax settings error, using defaults:', error.message);
+            console.log('Tax settings table may not exist yet, using defaults:', error.message);
             return successResponse({
               filing_status: 'single',
               income_bracket: '22',
@@ -614,29 +619,53 @@ export default {
           console.log('💾 Tax settings received:', body);
 
           try {
-            // Store tax settings as JSON in users table
-            const settings = {
-              filing_status: body.filing_status || 'single',
-              income_bracket: body.income_bracket || '22',
-              tax_year: body.tax_year || 2025,
-              updated_at: new Date().toISOString()
-            };
+            // First try to create table if it doesn't exist (will fail silently if exists)
+            try {
+              await env.DB.prepare(`
+                CREATE TABLE IF NOT EXISTS user_tax_settings (
+                  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+                  user_id TEXT NOT NULL,
+                  filing_status TEXT NOT NULL DEFAULT 'single',
+                  income_bracket TEXT NOT NULL DEFAULT '22',
+                  tax_year INTEGER NOT NULL DEFAULT 2025,
+                  created_at TEXT DEFAULT (datetime('now')),
+                  updated_at TEXT DEFAULT (datetime('now')),
+                  FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+              `).run();
+              console.log('✅ user_tax_settings table ready');
+            } catch (createError) {
+              console.log('Table creation attempted:', createError.message);
+            }
+
+            // Insert or update tax settings
+            const settingsId = crypto.randomUUID();
 
             await env.DB.prepare(`
-              UPDATE users SET tax_settings = ? WHERE id = ?
-            `).bind(JSON.stringify(settings), session.user_id).run();
+              INSERT OR REPLACE INTO user_tax_settings
+              (id, user_id, filing_status, income_bracket, tax_year, updated_at)
+              VALUES (?, ?, ?, ?, ?, datetime('now'))
+            `).bind(
+              settingsId,
+              session.user_id,
+              body.filing_status || 'single',
+              body.income_bracket || '22',
+              body.tax_year || 2025
+            ).run();
+
+            console.log(`✅ Tax settings saved for user ${session.user_id}`);
 
             return successResponse({
               message: 'Tax settings saved successfully',
-              settings: settings
+              settings: {
+                filing_status: body.filing_status || 'single',
+                income_bracket: body.income_bracket || '22',
+                tax_year: body.tax_year || 2025
+              }
             });
           } catch (error) {
-            console.log('Tax settings save error:', error.message);
-            // Fallback - just acknowledge
-            return successResponse({
-              message: 'Tax settings received (storage limited)',
-              settings: body
-            });
+            console.error('Tax settings save error:', error.message);
+            return errorResponse('Failed to save tax settings: ' + error.message, 500);
           }
         }
 
