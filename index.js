@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.6.0';
-const BUILD = '2025.01.17-PREMIUM-DEFAULT';
+const VERSION = 'v2.6.1';
+const BUILD = '2025.01.17-DATABASE-MIGRATION';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,6 +98,60 @@ export default {
 
       const url = new URL(request.url);
       const pathname = url.pathname;
+
+      // Database migration endpoint (admin only)
+      if (pathname === '/migrate' && url.searchParams.get('admin') === 'true') {
+        try {
+          console.log('🔧 Running database migration for subscription fields...');
+
+          // Add subscription columns to users table
+          await env.DB.prepare(`
+            ALTER TABLE users ADD COLUMN subscription_tier TEXT DEFAULT 'free'
+          `).run();
+
+          await env.DB.prepare(`
+            ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'
+          `).run();
+
+          await env.DB.prepare(`
+            ALTER TABLE users ADD COLUMN subscription_start_date TEXT
+          `).run();
+
+          await env.DB.prepare(`
+            ALTER TABLE users ADD COLUMN subscription_end_date TEXT
+          `).run();
+
+          await env.DB.prepare(`
+            ALTER TABLE users ADD COLUMN payment_date TEXT
+          `).run();
+
+          await env.DB.prepare(`
+            ALTER TABLE users ADD COLUMN trial_end_date TEXT
+          `).run();
+
+          console.log('✅ Database migration completed successfully');
+
+          return new Response(JSON.stringify({
+            success: true,
+            message: 'Database migration completed - subscription fields added',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          });
+
+        } catch (error) {
+          console.error('❌ Migration error:', error);
+          return new Response(JSON.stringify({
+            success: false,
+            message: 'Migration failed: ' + error.message,
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          });
+        }
+      }
 
       // Database schema discovery endpoint (admin only)
       if (pathname === '/schema' && url.searchParams.get('admin') === 'true') {
