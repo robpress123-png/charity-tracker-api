@@ -178,15 +178,15 @@ export default {
 
           console.log('✅ Created user_charities table');
 
-          // Ensure 'personal-charity' placeholder exists in master charities for foreign key compatibility
+          // Ensure 'charity-manual-entry' placeholder exists in master charities for foreign key compatibility
           try {
             await env.DB.prepare(`
               INSERT OR IGNORE INTO charities (id, name, ein, is_verified, verification_date)
-              VALUES ('personal-charity', 'Personal Charity Placeholder', NULL, 0, NULL)
+              VALUES ('charity-manual-entry', 'Manual Entry / Personal Charity', NULL, 0, NULL)
             `).run();
-            console.log('✅ Personal charity placeholder added to master charities table');
+            console.log('✅ Manual entry placeholder added to master charities table');
           } catch (placeholderError) {
-            console.log('⚠️ Could not add personal charity placeholder:', placeholderError.message);
+            console.log('⚠️ Could not add manual entry placeholder:', placeholderError.message);
           }
 
           console.log('✅ Database migration completed successfully');
@@ -493,6 +493,17 @@ export default {
             return errorResponse('Authentication required', 401);
           }
 
+          // Ensure 'charity-manual-entry' placeholder exists for foreign key compatibility
+          try {
+            await env.DB.prepare(`
+              INSERT OR IGNORE INTO charities (id, name, ein, is_verified, verification_date)
+              VALUES ('charity-manual-entry', 'Manual Entry / Personal Charity', NULL, 0, NULL)
+            `).run();
+            console.log('✅ Ensured manual entry placeholder exists in master charities table');
+          } catch (placeholderError) {
+            console.log('⚠️ Could not ensure manual entry placeholder:', placeholderError.message);
+          }
+
           const body = await request.json();
           const { name, ein, address, city, state, zip } = body;
 
@@ -741,8 +752,8 @@ export default {
             if (body.charity_id && body.charity_id !== 'charity-manual-entry') {
               // Check if this is a personal charity (starts with '109' for our numeric range)
               if (String(body.charity_id).startsWith('109')) {
-                console.log('💡 Personal charity detected, using special placeholder for foreign key compatibility:', body.charity_id);
-                finalCharityId = 'personal-charity'; // Use special placeholder for personal charities
+                console.log('💡 Personal charity detected, using manual-entry placeholder for foreign key compatibility:', body.charity_id);
+                finalCharityId = 'charity-manual-entry'; // Use existing manual-entry placeholder for personal charities
               } else {
                 console.log('💡 Using master charity_id directly:', body.charity_id);
               }
