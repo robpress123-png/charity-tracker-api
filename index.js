@@ -1,10 +1,10 @@
 /**
- * Charity Tracker API - DONATIONS FIX & VERSIONING
- * Version: v2.2.0 - DONATIONS API FIX & PROPER VERSIONING
+ * Charity Tracker API - Backend Service
+ * Independent versioning from frontend
  */
 
-const VERSION = 'v2.2.1';
-const BUILD = '2025.09.17-TOOLS-SECTION';
+const API_VERSION = 'v3.0.0';
+const API_BUILD = '2025.09.17-TOOLS-ENDPOINTS';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -259,7 +259,7 @@ export default {
       // Version endpoint
       if (pathname === '/version') {
         return new Response(JSON.stringify({
-          version: VERSION,
+          version: API_VERSION,
           build: BUILD,
           service: 'Charity Tracker API',
           deployment_status: 'ULTIMATE_FIX_DEPLOYMENT',
@@ -639,7 +639,7 @@ export default {
           return successResponse({
             charities: charities.results || [],
             backend_version: {
-              version: VERSION,
+              version: API_VERSION,
               build: BUILD,
               service: 'Charity Tracker API'
             }
