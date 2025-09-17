@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.2.1';
-const BUILD = '2025.01.17-SAVE-DONATIONS';
+const VERSION = 'v2.2.2';
+const BUILD = '2025.01.17-AUTH-ME';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -235,6 +235,26 @@ export default {
             `).bind(sessionId).run();
           }
           return successResponse(null, 'Logout successful');
+        }
+
+        // Check current user session
+        if (apiPath === '/auth/me' && request.method === 'GET') {
+          const sessionId = getSessionFromRequest(request);
+          const session = await validateSession(sessionId, env);
+
+          if (!session) {
+            return errorResponse('Not authenticated', 401);
+          }
+
+          return successResponse({
+            user: {
+              id: session.user_id,
+              email: session.email,
+              is_admin: session.is_admin || false,
+              firstName: 'User',
+              lastName: 'Demo'
+            }
+          }, 'User authenticated');
         }
 
         // USER CHARITIES
