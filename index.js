@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.1.7';
-const BUILD = '2025.01.17-ULTIMATE-FIX';
+const VERSION = 'v2.1.8';
+const BUILD = '2025.01.17-CSRF-TOKEN-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -137,11 +137,12 @@ export default {
             const sessionId = crypto.randomUUID();
 
             try {
-              // Method 1: Try with string literal
+              // Method 1: Try with string literal and csrf_token
+              const csrfToken = crypto.randomUUID();
               await env.DB.prepare(`
-                INSERT INTO user_sessions (id, user_id, expires_at)
-                VALUES (?, ?, datetime('now', '+24 hours'))
-              `).bind(sessionId, user.id).run();
+                INSERT INTO user_sessions (id, user_id, expires_at, csrf_token)
+                VALUES (?, ?, datetime('now', '+24 hours'), ?)
+              `).bind(sessionId, user.id, csrfToken).run();
 
               console.log('✅ Session created with Method 1:', sessionId);
             } catch (sessionError1) {
