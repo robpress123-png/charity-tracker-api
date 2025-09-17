@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.2.5';
-const BUILD = '2025.01.17-CHARITY-ID-FIX';
+const VERSION = 'v2.2.6';
+const BUILD = '2025.01.17-SIMPLE-DONATION-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -452,128 +452,28 @@ export default {
             // Generate donation ID
             const donationId = crypto.randomUUID();
 
-            // First, discover what tables exist
-            console.log('🔍 Discovering database tables...');
-            const tablesResult = await env.DB.prepare(`
-              SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%donation%'
-            `).all();
+            // SIMPLE APPROACH: Just use the exact same pattern as existing working records
+            await env.DB.prepare(`
+              INSERT INTO donations (
+                id, user_id, charity_id, charity_name,
+                tax_deductible_amount, type, description,
+                date, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            `).bind(
+              donationId,
+              session.user_id,
+              body.charity_id || 'charity-manual-entry',
+              body.charity_name || body.charity || 'Manual Entry',
+              body.amount || 0,
+              body.type || 'money',
+              body.description || 'Donation via Charity Tracker',
+              body.date || new Date().toISOString().split('T')[0]
+            ).run();
 
-            const tableNames = (tablesResult.results || []).map(row => row.name);
-            console.log('📋 Available donation tables:', tableNames);
-
-            // Check which table has existing data (same logic as GET endpoint)
-            let targetTable = null;
-            let insertSQL = null;
-            let bindParams = null;
-
-            // Try 'donations' table first - full structure
-            if (tableNames.includes('donations')) {
-              try {
-                // Test if table accepts full structure
-                await env.DB.prepare(`
-                  SELECT id, user_id, charity_id, charity_name, amount, tax_deductible_amount, type, description, date, created_at
-                  FROM donations LIMIT 1
-                `).first();
-
-                targetTable = 'donations';
-                insertSQL = `
-                  INSERT INTO donations (id, user_id, charity_id, charity_name, tax_deductible_amount, type, description, date, created_at, updated_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-                `;
-                bindParams = [
-                  donationId,
-                  session.user_id,
-                  body.charity_id || 'charity-manual-entry',
-                  body.charity_name || body.charity || 'Unknown Charity',
-                  body.amount || body.tax_deductible_amount || 0,
-                  body.type || 'money',
-                  body.description || null,
-                  body.date || new Date().toISOString().split('T')[0]
-                ];
-                console.log('✅ Using donations table with full structure');
-              } catch (donationsError) {
-                console.log('⚠️ donations table structure mismatch:', donationsError.message);
-              }
-            }
-
-            // Try 'user_donations' table if donations failed or doesn't exist
-            if (!targetTable && tableNames.includes('user_donations')) {
-              try {
-                // Test user_donations structure
-                await env.DB.prepare(`
-                  SELECT id, user_id, charity_name, amount, date, created_at
-                  FROM user_donations LIMIT 1
-                `).first();
-
-                targetTable = 'user_donations';
-                insertSQL = `
-                  INSERT INTO user_donations (id, user_id, charity_name, amount, date, created_at)
-                  VALUES (?, ?, ?, ?, ?, datetime('now'))
-                `;
-                bindParams = [
-                  donationId,
-                  session.user_id,
-                  body.charity_name || body.charity || 'Unknown Charity',
-                  body.amount || 0,
-                  body.date || new Date().toISOString().split('T')[0]
-                ];
-                console.log('✅ Using user_donations table with simplified structure');
-              } catch (userDonationsError) {
-                console.log('⚠️ user_donations table structure mismatch:', userDonationsError.message);
-              }
-            }
-
-            // If no suitable table found, try creating in the same table that GET endpoint uses
-            if (!targetTable) {
-              console.log('🔧 No suitable table found, checking what GET endpoint uses...');
-
-              // Check if there's any donation data and which table it's in
-              for (const tableName of ['donations', 'user_donations']) {
-                try {
-                  const checkData = await env.DB.prepare(`
-                    SELECT COUNT(*) as count FROM ${tableName}
-                  `).first();
-
-                  if (checkData && checkData.count > 0) {
-                    console.log(`📊 Found ${checkData.count} records in ${tableName} table`);
-
-                    // Get table schema
-                    const schemaResult = await env.DB.prepare(`
-                      PRAGMA table_info(${tableName})
-                    `).all();
-
-                    const columns = (schemaResult.results || []).map(col => col.name);
-                    console.log(`🏗️ ${tableName} columns:`, columns);
-
-                    // Use this table with minimal required columns
-                    targetTable = tableName;
-
-                    if (tableName === 'donations') {
-                      insertSQL = `INSERT INTO donations (id, user_id, charity_id, charity_name, tax_deductible_amount, date) VALUES (?, ?, ?, ?, ?, ?)`;
-                      bindParams = [donationId, session.user_id, body.charity_id || 'charity-manual-entry', body.charity_name || body.charity || 'Unknown Charity', body.amount || 0, body.date || new Date().toISOString().split('T')[0]];
-                    } else {
-                      insertSQL = `INSERT INTO user_donations (id, user_id, charity_name, amount, date) VALUES (?, ?, ?, ?, ?)`;
-                      bindParams = [donationId, session.user_id, body.charity_name || body.charity || 'Unknown Charity', body.amount || 0, body.date || new Date().toISOString().split('T')[0]];
-                    }
-                    break;
-                  }
-                } catch (e) {
-                  console.log(`❌ Could not check ${tableName}:`, e.message);
-                }
-              }
-            }
-
-            if (!targetTable) {
-              return errorResponse('No suitable donation table found in database', 500);
-            }
-
-            // Execute the insert
-            await env.DB.prepare(insertSQL).bind(...bindParams).run();
-            console.log(`✅ Donation saved to ${targetTable} table: ${donationId}`);
+            console.log(`✅ Donation saved: ${donationId}`);
 
             return successResponse({
               id: donationId,
-              table_used: targetTable,
               message: 'Donation saved successfully'
             }, 'Donation saved successfully', 201);
 
