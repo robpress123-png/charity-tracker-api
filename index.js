@@ -1,10 +1,10 @@
 /**
- * Charity Tracker API - Fixed Authentication Version
- * Version: v2.1.5 - Simplified Auth for Demo
+ * Charity Tracker API - FINAL FIXED Authentication Version
+ * Version: v2.1.6 - SESSION CREATION FIX
  */
 
-const VERSION = 'v2.1.5';
-const BUILD = '2025.01.17-FIXED-AUTH';
+const VERSION = 'v2.1.6';
+const BUILD = '2025.01.17-SESSION-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -83,7 +83,7 @@ export default {
           version: VERSION,
           build: BUILD,
           service: 'Charity Tracker API',
-          deployment_status: 'FIXED_AUTH_DEPLOYMENT',
+          deployment_status: 'SESSION_FIX_DEPLOYMENT',
           timestamp: new Date().toISOString()
         }), {
           status: 200,
@@ -132,15 +132,13 @@ export default {
 
           console.log('✅ Password accepted');
 
-          // Create session
+          // Create session - FIXED: Use SQLite datetime function
           const sessionId = crypto.randomUUID();
-          const expiresAt = new Date();
-          expiresAt.setHours(expiresAt.getHours() + 24); // 24 hour session
 
           await env.DB.prepare(`
             INSERT INTO user_sessions (id, user_id, expires_at)
-            VALUES (?, ?, ?)
-          `).bind(sessionId, user.id, expiresAt.toISOString()).run();
+            VALUES (?, ?, datetime('now', '+24 hours'))
+          `).bind(sessionId, user.id).run();
 
           console.log('✅ Session created:', sessionId);
 
@@ -293,7 +291,7 @@ export default {
       }
 
       // Default response
-      return new Response('🚀 FIXED AUTH DEPLOYMENT v2.1.5 - Use /api/* endpoints', {
+      return new Response('🚀 SESSION FIX DEPLOYMENT v2.1.6 - Use /api/* endpoints', {
         status: 200,
         headers: corsHeaders
       });
