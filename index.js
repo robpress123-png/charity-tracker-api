@@ -728,8 +728,8 @@ export default {
               INSERT INTO donations (
                 id, user_id, charity_id, charity_name, charity_address, charity_ein,
                 tax_deductible_amount, type, description, date,
-                cost_basis, metadata, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                fair_market_value, cost_basis, metadata, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
             `).bind(
               donationId,
               session.user_id,
@@ -741,6 +741,7 @@ export default {
               body.type || 'money',
               body.description || null,
               body.date || new Date().toISOString().split('T')[0],
+              body.fair_market_value || null,
               body.cost_basis || null,
               Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null
             ).run();
