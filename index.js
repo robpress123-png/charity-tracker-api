@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.2.6';
-const BUILD = '2025.01.17-SIMPLE-DONATION-FIX';
+const VERSION = 'v2.2.7';
+const BUILD = '2025.01.17-AMOUNT-FIELD-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -464,7 +464,7 @@ export default {
               session.user_id,
               body.charity_id || 'charity-manual-entry',
               body.charity_name || body.charity || 'Manual Entry',
-              body.amount || 0,
+              body.tax_deductible_amount || body.amount || 0,
               body.type || 'money',
               body.description || 'Donation via Charity Tracker',
               body.date || new Date().toISOString().split('T')[0]
