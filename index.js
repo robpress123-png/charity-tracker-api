@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.2.9';
-const BUILD = '2025.01.17-USER-TAX-PERSISTENCE-FIX';
+const VERSION = 'v2.3.0';
+const BUILD = '2025.01.17-SCHEMA-DISCOVERY';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -76,6 +76,61 @@ export default {
 
       const url = new URL(request.url);
       const pathname = url.pathname;
+
+      // Database schema discovery endpoint (admin only)
+      if (pathname === '/schema' && url.searchParams.get('admin') === 'true') {
+        try {
+          // Get all tables
+          const tables = await env.DB.prepare(`
+            SELECT name FROM sqlite_master WHERE type='table' ORDER BY name
+          `).all();
+
+          const schema = {};
+
+          for (const table of tables.results || []) {
+            // Get column info for each table
+            const columns = await env.DB.prepare(`
+              PRAGMA table_info(${table.name})
+            `).all();
+
+            // Get sample data (first row)
+            const sample = await env.DB.prepare(`
+              SELECT * FROM ${table.name} LIMIT 1
+            `).first();
+
+            schema[table.name] = {
+              columns: (columns.results || []).map(col => ({
+                name: col.name,
+                type: col.type,
+                nullable: !col.notnull,
+                default: col.dflt_value
+              })),
+              sample_data: sample
+            };
+          }
+
+          return new Response(JSON.stringify({
+            database_schema: schema,
+            timestamp: new Date().toISOString()
+          }, null, 2), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            error: 'Schema discovery failed: ' + error.message
+          }), {
+            status: 500,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          });
+        }
+      }
 
       // Version endpoint
       if (pathname === '/version') {
