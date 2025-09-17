@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.2.7';
-const BUILD = '2025.01.17-AMOUNT-FIELD-FIX';
+const VERSION = 'v2.2.8';
+const BUILD = '2025.01.17-COMPLETE-FIELD-MAPPING';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -452,22 +452,44 @@ export default {
             // Generate donation ID
             const donationId = crypto.randomUUID();
 
-            // SIMPLE APPROACH: Just use the exact same pattern as existing working records
+            // COMPLETE FIELD MAPPING: Capture all frontend fields
+
+            // Prepare type-specific metadata
+            const metadata = {};
+            if (body.type === 'items') {
+              metadata.item_category = body.item_category;
+              metadata.item_type = body.item_type;
+              metadata.item_condition = body.item_condition;
+            } else if (body.type === 'mileage') {
+              metadata.miles_driven = body.miles_driven;
+              metadata.mileage_rate = body.mileage_rate;
+            } else if (body.type === 'stock') {
+              metadata.stock_symbol = body.stock_symbol;
+              metadata.shares = body.shares;
+            } else if (body.type === 'crypto') {
+              metadata.crypto_currency = body.crypto_currency;
+              metadata.crypto_amount = body.crypto_amount;
+            }
+
             await env.DB.prepare(`
               INSERT INTO donations (
-                id, user_id, charity_id, charity_name,
-                tax_deductible_amount, type, description,
-                date, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                id, user_id, charity_id, charity_name, charity_address, charity_ein,
+                tax_deductible_amount, type, description, date,
+                cost_basis, metadata, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
             `).bind(
               donationId,
               session.user_id,
               body.charity_id || 'charity-manual-entry',
               body.charity_name || body.charity || 'Manual Entry',
+              body.charity_address || null,
+              body.charity_ein || null,
               body.tax_deductible_amount || body.amount || 0,
               body.type || 'money',
-              body.description || 'Donation via Charity Tracker',
-              body.date || new Date().toISOString().split('T')[0]
+              body.description || null,
+              body.date || new Date().toISOString().split('T')[0],
+              body.cost_basis || null,
+              Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null
             ).run();
 
             console.log(`✅ Donation saved: ${donationId}`);
