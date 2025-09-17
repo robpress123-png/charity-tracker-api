@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.6.5';
-const BUILD = '2025.01.17-CHARITY-API-FIX';
+const VERSION = 'v2.6.6';
+const BUILD = '2025.01.17-SUBMIT-APPROVAL-API';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -575,6 +575,46 @@ export default {
           }
 
           return successResponse({ charities: userCharities.results || [] });
+        }
+
+        // Submit charity for approval endpoint
+        if (apiPath === '/user-charities/submit-for-approval' && request.method === 'POST') {
+          const sessionId = getSessionFromRequest(request);
+          const session = await validateSession(sessionId, env);
+
+          if (!session) {
+            return errorResponse('Authentication required', 401);
+          }
+
+          try {
+            const body = await request.json();
+            const { charityId, charityName } = body;
+
+            if (!charityId || !charityName) {
+              return errorResponse('Charity ID and name are required', 400);
+            }
+
+            console.log(`📤 Submitting charity ${charityId} (${charityName}) for approval`);
+
+            // Update the charity's review status to indicate it's been submitted for approval
+            await env.DB.prepare(`
+              UPDATE user_charities
+              SET review_status = 'pending', updated_at = CURRENT_TIMESTAMP
+              WHERE id = ? AND user_id = ?
+            `).bind(charityId, session.user_id).run();
+
+            console.log(`✅ Charity ${charityName} marked as pending approval`);
+
+            return successResponse({
+              charityId: charityId,
+              charityName: charityName,
+              status: 'pending'
+            }, 'Charity submitted for approval successfully');
+
+          } catch (error) {
+            console.error('Submit for approval error:', error);
+            return errorResponse('Failed to submit charity for approval: ' + error.message, 500);
+          }
         }
 
         // Charities endpoint with version info
