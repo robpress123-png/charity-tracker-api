@@ -3,8 +3,8 @@
  * Version: v2.2.0 - DONATIONS API FIX & PROPER VERSIONING
  */
 
-const VERSION = 'v2.2.0';
-const BUILD = '2025.09.17-DONATIONS-FIX';
+const VERSION = 'v2.2.1';
+const BUILD = '2025.09.17-TOOLS-SECTION';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -756,6 +756,45 @@ export default {
           } catch (error) {
             console.error('❌ Error saving donation:', error);
             return errorResponse('Failed to save donation: ' + error.message, 500);
+          }
+        }
+
+        // DELETE donation endpoint
+        if (apiPath.startsWith('/donations/') && request.method === 'DELETE') {
+          const sessionId = getSessionFromRequest(request);
+          const session = await validateSession(sessionId, env);
+
+          if (!session) {
+            return errorResponse('Authentication required', 401);
+          }
+
+          try {
+            const donationId = apiPath.split('/donations/')[1];
+
+            // Verify donation belongs to user
+            const donation = await env.DB.prepare(`
+              SELECT id FROM donations WHERE id = ? AND user_id = ?
+            `).bind(donationId, session.user_id).first();
+
+            if (!donation) {
+              return errorResponse('Donation not found or access denied', 404);
+            }
+
+            // Delete the donation
+            await env.DB.prepare(`
+              DELETE FROM donations WHERE id = ? AND user_id = ?
+            `).bind(donationId, session.user_id).run();
+
+            console.log(`✅ Donation deleted: ${donationId} by user ${session.user_id}`);
+
+            return successResponse({
+              id: donationId,
+              message: 'Donation deleted successfully'
+            }, 'Donation deleted successfully', 200);
+
+          } catch (error) {
+            console.error('❌ Error deleting donation:', error);
+            return errorResponse('Failed to delete donation: ' + error.message, 500);
           }
         }
 
