@@ -705,6 +705,21 @@ export default {
             // Generate donation ID
             const donationId = crypto.randomUUID();
 
+            // Handle personal charity references - check if charity_id exists in master charities
+            let finalCharityId = body.charity_id || 'charity-manual-entry';
+
+            if (body.charity_id && body.charity_id !== 'charity-manual-entry') {
+              // Check if this is a personal charity (exists in user_charities but not in main charities)
+              const isPersonalCharity = await env.DB.prepare(`
+                SELECT id FROM user_charities WHERE id = ? AND user_id = ?
+              `).bind(body.charity_id, session.user_id).first();
+
+              if (isPersonalCharity) {
+                console.log('💡 Personal charity detected, using NULL charity_id:', body.charity_id);
+                finalCharityId = null; // Use NULL for personal charities to avoid foreign key issues
+              }
+            }
+
             // COMPLETE FIELD MAPPING: Capture all frontend fields
 
             // Prepare type-specific metadata
@@ -733,7 +748,7 @@ export default {
             `).bind(
               donationId,
               session.user_id,
-              body.charity_id || 'charity-manual-entry',
+              finalCharityId,
               body.charity_name || body.charity || 'Manual Entry',
               body.charity_address || null,
               body.charity_ein || null,
