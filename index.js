@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.6.4';
-const BUILD = '2025.01.17-SAFE-MIGRATION';
+const VERSION = 'v2.6.5';
+const BUILD = '2025.01.17-CHARITY-API-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -495,8 +495,8 @@ export default {
 
           try {
             await env.DB.prepare(`
-              INSERT INTO user_charities (id, user_id, name, ein, address, city, state, zip, is_submitted_for_approval)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+              INSERT INTO user_charities (id, user_id, name, ein, address, city, state, zip_code, review_status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
             `).bind(
               charityId,
               session.user_id,
@@ -509,7 +509,7 @@ export default {
             ).run();
 
             createdCharity = await env.DB.prepare(`
-              SELECT id, name, ein, address, city, state, zip, created_at
+              SELECT id, name, ein, address, city, state, zip_code as zip, created_at
               FROM user_charities WHERE id = ?
             `).bind(charityId).first();
 
@@ -558,7 +558,7 @@ export default {
 
           try {
             userCharities = await env.DB.prepare(`
-              SELECT id, name, ein, address, city, state, zip, is_submitted_for_approval, created_at
+              SELECT id, name, ein, address, city, state, zip_code as zip, review_status, created_at
               FROM user_charities WHERE user_id = ? ORDER BY created_at DESC
             `).bind(session.user_id).all();
           } catch (e1) {
