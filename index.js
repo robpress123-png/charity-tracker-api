@@ -757,8 +757,7 @@ export default {
             console.error('❌ Error saving donation:', error);
             console.error('❌ Error details:', {
               message: error.message,
-              stack: error.stack,
-              donationData: body
+              stack: error.stack
             });
             return errorResponse('Failed to save donation: ' + error.message, 500);
           }
