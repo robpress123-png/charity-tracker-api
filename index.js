@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.4.0';
-const BUILD = '2025.01.17-PROPER-TAX-TABLE';
+const VERSION = 'v2.4.1';
+const BUILD = '2025.01.17-USER-PROFILE-API';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -666,6 +666,54 @@ export default {
           } catch (error) {
             console.error('Tax settings save error:', error.message);
             return errorResponse('Failed to save tax settings: ' + error.message, 500);
+          }
+        }
+
+        // USER PROFILE UPDATE endpoint
+        if (apiPath === '/users/profile' && request.method === 'PUT') {
+          const sessionId = getSessionFromRequest(request);
+          const session = await validateSession(sessionId, env);
+
+          if (!session) {
+            return errorResponse('Authentication required', 401);
+          }
+
+          try {
+            const body = await request.json();
+            console.log('👤 Profile update received:', body);
+
+            // Extract first and last names from full name if provided
+            let firstName = body.firstName || '';
+            let lastName = body.lastName || '';
+
+            if (body.name && !firstName && !lastName) {
+              const nameParts = body.name.trim().split(' ');
+              firstName = nameParts[0] || '';
+              lastName = nameParts.slice(1).join(' ') || '';
+            }
+
+            // Update user profile in database
+            await env.DB.prepare(`
+              UPDATE users
+              SET first_name = ?, last_name = ?
+              WHERE id = ?
+            `).bind(firstName, lastName, session.user_id).run();
+
+            console.log(`✅ Profile updated for user ${session.user_id}:`, { firstName, lastName });
+
+            return successResponse({
+              message: 'Profile updated successfully',
+              user: {
+                id: session.user_id,
+                email: session.email,
+                firstName: firstName,
+                lastName: lastName,
+                name: `${firstName} ${lastName}`.trim()
+              }
+            });
+          } catch (error) {
+            console.error('Profile update error:', error.message);
+            return errorResponse('Failed to update profile: ' + error.message, 500);
           }
         }
 
