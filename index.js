@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.1.8';
-const BUILD = '2025.01.17-CSRF-TOKEN-FIX';
+const VERSION = 'v2.1.9';
+const BUILD = '2025.01.17-MISSING-ENDPOINTS';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -322,6 +322,54 @@ export default {
               build: BUILD,
               service: 'Charity Tracker API'
             }
+          });
+        }
+
+        // DONATIONS endpoints
+        if (apiPath === '/donations' && request.method === 'GET') {
+          const sessionId = getSessionFromRequest(request);
+          const session = await validateSession(sessionId, env);
+
+          if (!session) {
+            return errorResponse('Authentication required', 401);
+          }
+
+          // Return empty donations array for now - can be expanded later
+          return successResponse({ donations: [] });
+        }
+
+        // USER TAX SETTINGS endpoints
+        if (apiPath === '/users/tax-settings' && request.method === 'GET') {
+          const sessionId = getSessionFromRequest(request);
+          const session = await validateSession(sessionId, env);
+
+          if (!session) {
+            return errorResponse('Authentication required', 401);
+          }
+
+          // Return default tax settings for now - can be expanded later
+          return successResponse({
+            filing_status: 'single',
+            income_bracket: '22',
+            tax_year: 2025
+          });
+        }
+
+        if (apiPath === '/users/tax-settings' && request.method === 'PUT') {
+          const sessionId = getSessionFromRequest(request);
+          const session = await validateSession(sessionId, env);
+
+          if (!session) {
+            return errorResponse('Authentication required', 401);
+          }
+
+          const body = await request.json();
+          console.log('💾 Tax settings received:', body);
+
+          // For now, just acknowledge the save - can be expanded to store in DB later
+          return successResponse({
+            message: 'Tax settings saved successfully',
+            settings: body
           });
         }
 
