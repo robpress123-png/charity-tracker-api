@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.2.4';
-const BUILD = '2025.01.17-TABLE-COLUMN-FIX';
+const VERSION = 'v2.2.5';
+const BUILD = '2025.01.17-CHARITY-ID-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -483,7 +483,7 @@ export default {
                 bindParams = [
                   donationId,
                   session.user_id,
-                  body.charity_id || null,
+                  body.charity_id || 'charity-manual-entry',
                   body.charity_name || body.charity || 'Unknown Charity',
                   body.amount || body.tax_deductible_amount || 0,
                   body.type || 'money',
@@ -549,8 +549,8 @@ export default {
                     targetTable = tableName;
 
                     if (tableName === 'donations') {
-                      insertSQL = `INSERT INTO donations (id, user_id, charity_name, tax_deductible_amount, date) VALUES (?, ?, ?, ?, ?)`;
-                      bindParams = [donationId, session.user_id, body.charity_name || body.charity || 'Unknown Charity', body.amount || 0, body.date || new Date().toISOString().split('T')[0]];
+                      insertSQL = `INSERT INTO donations (id, user_id, charity_id, charity_name, tax_deductible_amount, date) VALUES (?, ?, ?, ?, ?, ?)`;
+                      bindParams = [donationId, session.user_id, body.charity_id || 'charity-manual-entry', body.charity_name || body.charity || 'Unknown Charity', body.amount || 0, body.date || new Date().toISOString().split('T')[0]];
                     } else {
                       insertSQL = `INSERT INTO user_donations (id, user_id, charity_name, amount, date) VALUES (?, ?, ?, ?, ?)`;
                       bindParams = [donationId, session.user_id, body.charity_name || body.charity || 'Unknown Charity', body.amount || 0, body.date || new Date().toISOString().split('T')[0]];
