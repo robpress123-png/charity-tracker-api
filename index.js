@@ -177,6 +177,23 @@ export default {
           `).run();
 
           console.log('✅ Created user_charities table');
+
+          // Check if donations table needs to allow NULL charity_id for personal charities
+          try {
+            // First, check if we can insert a test record with NULL charity_id
+            await env.DB.prepare(`
+              INSERT INTO donations (id, user_id, charity_id, charity_name, tax_deductible_amount, type, date, created_at, updated_at)
+              VALUES ('test-null-charity', 'test-user', NULL, 'Test Personal Charity', 100, 'money', '2025-01-01', datetime('now'), datetime('now'))
+            `).run();
+
+            // If successful, clean up the test record
+            await env.DB.prepare(`DELETE FROM donations WHERE id = 'test-null-charity'`).run();
+            console.log('✅ Donations table already supports NULL charity_id');
+          } catch (nullTestError) {
+            console.log('⚠️ Donations table does not support NULL charity_id:', nullTestError.message);
+            console.log('💡 Note: Personal charity donations may need schema modification to support NULL charity_id');
+          }
+
           console.log('✅ Database migration completed successfully');
 
           return new Response(JSON.stringify({
@@ -523,20 +540,8 @@ export default {
               zip || null
             ).run();
 
-            // Also add to master charities table for foreign key compatibility
-            try {
-              await env.DB.prepare(`
-                INSERT OR IGNORE INTO charities (id, name, ein, is_verified, verification_date)
-                VALUES (?, ?, ?, 0, NULL)
-              `).bind(
-                charityId,
-                name.trim(),
-                ein || null
-              ).run();
-              console.log('✅ Personal charity added to master charities table:', charityId);
-            } catch (masterError) {
-              console.log('⚠️ Could not add to master charities:', masterError.message);
-            }
+            // Personal charities should NOT be added to master charities table
+            // Master charities are only for admin-approved organizations
 
             createdCharity = await env.DB.prepare(`
               SELECT id, name, ein, address, city, state, zip_code as zip, created_at
@@ -735,12 +740,17 @@ export default {
             // Generate donation ID
             const donationId = crypto.randomUUID();
 
-            // Handle personal charity references - P-series IDs should work directly
+            // Handle personal charity references - use NULL for personal charities to avoid foreign key constraint
             let finalCharityId = body.charity_id || 'charity-manual-entry';
 
-            // Personal charities now use P-series IDs (P1, P2, etc.) which are compatible with foreign keys
             if (body.charity_id && body.charity_id !== 'charity-manual-entry') {
-              console.log('💡 Using charity_id directly (including P-series for personal charities):', body.charity_id);
+              // Check if this is a personal charity (starts with '109' for our numeric range)
+              if (String(body.charity_id).startsWith('109')) {
+                console.log('💡 Personal charity detected, using NULL charity_id for foreign key compatibility:', body.charity_id);
+                finalCharityId = null; // Use NULL for personal charities to avoid foreign key constraint
+              } else {
+                console.log('💡 Using master charity_id directly:', body.charity_id);
+              }
             }
 
             // COMPLETE FIELD MAPPING: Capture all frontend fields
