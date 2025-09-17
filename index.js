@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.5.0';
-const BUILD = '2025.01.17-REAL-PASSWORDS';
+const VERSION = 'v2.6.0';
+const BUILD = '2025.01.17-PREMIUM-DEFAULT';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -189,9 +189,11 @@ export default {
 
             console.log('🔍 Looking for user:', email);
 
-            // Find user
+            // Find user with subscription data
             const user = await env.DB.prepare(`
-              SELECT id, email, is_admin, first_name, last_name
+              SELECT id, email, password_hash, is_admin, first_name, last_name,
+                     subscription_tier, subscription_status, subscription_start_date,
+                     subscription_end_date, payment_date
               FROM users WHERE email = ?
             `).bind(email.toLowerCase()).first();
 
@@ -260,7 +262,12 @@ export default {
                 email: user.email,
                 is_admin: user.is_admin || false,
                 firstName: user.first_name || null,
-                lastName: user.last_name || null
+                lastName: user.last_name || null,
+                subscription_tier: user.subscription_tier || 'free',
+                subscription_status: user.subscription_status || 'active',
+                subscription_start_date: user.subscription_start_date || null,
+                subscription_end_date: user.subscription_end_date || null,
+                payment_date: user.payment_date || null
               }
             }, 'Login successful');
 
@@ -287,23 +294,41 @@ export default {
             return errorResponse('User already exists', 409);
           }
 
-          // Create user with hashed password
+          // Create user with hashed password and Premium subscription
           const userId = crypto.randomUUID();
           const hashedPassword = await hashPassword(password);
 
+          // Set subscription dates: Premium for 1 year from registration
+          const now = new Date();
+          const subscriptionStart = now.toISOString();
+          const subscriptionEnd = new Date(now.getTime() + (365 * 24 * 60 * 60 * 1000)).toISOString(); // +1 year
+
           await env.DB.prepare(`
-            INSERT INTO users (id, email, password_hash, first_name, last_name, is_admin)
-            VALUES (?, ?, ?, ?, ?, FALSE)
-          `).bind(userId, email.toLowerCase(), hashedPassword, firstName || 'User', lastName || 'Demo').run();
+            INSERT INTO users (
+              id, email, password_hash, first_name, last_name, is_admin,
+              subscription_tier, subscription_status, subscription_start_date,
+              subscription_end_date, payment_date
+            )
+            VALUES (?, ?, ?, ?, ?, FALSE, 'premium', 'active', ?, ?, ?)
+          `).bind(
+            userId, email.toLowerCase(), hashedPassword,
+            firstName || 'User', lastName || 'Demo',
+            subscriptionStart, subscriptionEnd, subscriptionStart
+          ).run();
 
           return successResponse({
             user: {
               id: userId,
               email: email.toLowerCase(),
               firstName: firstName || 'User',
-              lastName: lastName || 'Demo'
+              lastName: lastName || 'Demo',
+              subscription_tier: 'premium',
+              subscription_status: 'active',
+              subscription_start_date: subscriptionStart,
+              subscription_end_date: subscriptionEnd,
+              payment_date: subscriptionStart
             }
-          }, 'Registration successful', 201);
+          }, 'Registration successful - Premium account activated!', 201);
         }
 
         if (apiPath === '/auth/logout' && request.method === 'POST') {
