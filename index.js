@@ -488,7 +488,13 @@ export default {
             return errorResponse('Charity name is required', 400);
           }
 
-          const charityId = crypto.randomUUID();
+          // Generate P-series ID for personal charities (P1, P2, P3, etc.)
+          const existingCount = await env.DB.prepare(`
+            SELECT COUNT(*) as count FROM user_charities WHERE id LIKE 'P%'
+          `).first();
+
+          const nextNumber = (existingCount?.count || 0) + 1;
+          const charityId = `P${nextNumber}`;
 
           // Try different possible table names for user charities
           let createdCharity = null;
@@ -507,6 +513,22 @@ export default {
               state || null,
               zip || null
             ).run();
+
+            // Also add to master charities table for foreign key compatibility
+            try {
+              await env.DB.prepare(`
+                INSERT OR IGNORE INTO charities (id, name, address, ein, is_verified, is_active, category)
+                VALUES (?, ?, ?, ?, 0, 1, 'personal')
+              `).bind(
+                charityId,
+                name.trim(),
+                address || null,
+                ein || null
+              ).run();
+              console.log('✅ Personal charity added to master charities table:', charityId);
+            } catch (masterError) {
+              console.log('⚠️ Could not add to master charities (table may not exist):', masterError.message);
+            }
 
             createdCharity = await env.DB.prepare(`
               SELECT id, name, ein, address, city, state, zip_code as zip, created_at
@@ -705,19 +727,12 @@ export default {
             // Generate donation ID
             const donationId = crypto.randomUUID();
 
-            // Handle personal charity references - check if charity_id exists in master charities
+            // Handle personal charity references - P-series IDs should work directly
             let finalCharityId = body.charity_id || 'charity-manual-entry';
 
+            // Personal charities now use P-series IDs (P1, P2, etc.) which are compatible with foreign keys
             if (body.charity_id && body.charity_id !== 'charity-manual-entry') {
-              // Check if this is a personal charity (exists in user_charities but not in main charities)
-              const isPersonalCharity = await env.DB.prepare(`
-                SELECT id FROM user_charities WHERE id = ? AND user_id = ?
-              `).bind(body.charity_id, session.user_id).first();
-
-              if (isPersonalCharity) {
-                console.log('💡 Personal charity detected, using placeholder charity_id:', body.charity_id);
-                finalCharityId = 'personal-charity-placeholder'; // Use placeholder for personal charities to avoid foreign key issues
-              }
+              console.log('💡 Using charity_id directly (including P-series for personal charities):', body.charity_id);
             }
 
             // COMPLETE FIELD MAPPING: Capture all frontend fields
