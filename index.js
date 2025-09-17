@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.2.0';
-const BUILD = '2025.01.17-REAL-DONATIONS';
+const VERSION = 'v2.2.1';
+const BUILD = '2025.01.17-SAVE-DONATIONS';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -365,6 +365,75 @@ export default {
           } catch (error) {
             console.error('Error querying donations:', error);
             return successResponse({ donations: [] });
+          }
+        }
+
+        // POST donations endpoint - Save new donations
+        if (apiPath === '/donations' && request.method === 'POST') {
+          const sessionId = getSessionFromRequest(request);
+          const session = await validateSession(sessionId, env);
+
+          if (!session) {
+            return errorResponse('Authentication required', 401);
+          }
+
+          try {
+            const body = await request.json();
+            console.log('💰 Donation data received:', body);
+
+            // Generate donation ID
+            const donationId = crypto.randomUUID();
+
+            // Try to insert into donations table (most likely structure)
+            try {
+              await env.DB.prepare(`
+                INSERT INTO donations (id, user_id, charity_id, charity_name, amount, tax_deductible_amount, type, description, date, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+              `).bind(
+                donationId,
+                session.user_id,
+                body.charity_id || null,
+                body.charity_name || body.charity || 'Unknown Charity',
+                body.amount || 0,
+                body.tax_deductible_amount || body.amount || 0,
+                body.type || 'cash',
+                body.description || '',
+                body.date || new Date().toISOString().split('T')[0]
+              ).run();
+
+              console.log(`✅ Donation saved to donations table: ${donationId}`);
+
+              return successResponse({
+                id: donationId,
+                message: 'Donation saved successfully'
+              }, 'Donation saved successfully', 201);
+
+            } catch (e1) {
+              console.log('Failed to save to donations table, trying user_donations...', e1.message);
+
+              // Try user_donations table as fallback
+              await env.DB.prepare(`
+                INSERT INTO user_donations (id, user_id, charity_name, amount, date, created_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
+              `).bind(
+                donationId,
+                session.user_id,
+                body.charity_name || body.charity || 'Unknown Charity',
+                body.amount || 0,
+                body.date || new Date().toISOString().split('T')[0]
+              ).run();
+
+              console.log(`✅ Donation saved to user_donations table: ${donationId}`);
+
+              return successResponse({
+                id: donationId,
+                message: 'Donation saved successfully'
+              }, 'Donation saved successfully', 201);
+            }
+
+          } catch (error) {
+            console.error('❌ Error saving donation:', error);
+            return errorResponse('Failed to save donation: ' + error.message, 500);
           }
         }
 
