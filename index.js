@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.1.9';
-const BUILD = '2025.01.17-MISSING-ENDPOINTS';
+const VERSION = 'v2.2.0';
+const BUILD = '2025.01.17-REAL-DONATIONS';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -334,8 +334,38 @@ export default {
             return errorResponse('Authentication required', 401);
           }
 
-          // Return empty donations array for now - can be expanded later
-          return successResponse({ donations: [] });
+          try {
+            // Try to query for user donations from various possible table names
+            let donations = [];
+
+            // Try 'donations' table first
+            try {
+              const donationsResult = await env.DB.prepare(`
+                SELECT * FROM donations WHERE user_id = ? ORDER BY date DESC
+              `).bind(session.user_id).all();
+              donations = donationsResult.results || [];
+              console.log(`Found ${donations.length} donations in 'donations' table for user ${session.user_id}`);
+            } catch (e1) {
+              console.log('No donations table found, trying user_donations...');
+
+              // Try 'user_donations' table
+              try {
+                const userDonationsResult = await env.DB.prepare(`
+                  SELECT * FROM user_donations WHERE user_id = ? ORDER BY created_at DESC
+                `).bind(session.user_id).all();
+                donations = userDonationsResult.results || [];
+                console.log(`Found ${donations.length} donations in 'user_donations' table for user ${session.user_id}`);
+              } catch (e2) {
+                console.log('No user_donations table found either. Returning empty array.');
+                console.log('Available tables can be checked with: SELECT name FROM sqlite_master WHERE type="table"');
+              }
+            }
+
+            return successResponse({ donations });
+          } catch (error) {
+            console.error('Error querying donations:', error);
+            return successResponse({ donations: [] });
+          }
         }
 
         // USER TAX SETTINGS endpoints
