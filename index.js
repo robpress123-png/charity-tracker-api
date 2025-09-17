@@ -715,8 +715,8 @@ export default {
               `).bind(body.charity_id, session.user_id).first();
 
               if (isPersonalCharity) {
-                console.log('💡 Personal charity detected, using NULL charity_id:', body.charity_id);
-                finalCharityId = null; // Use NULL for personal charities to avoid foreign key issues
+                console.log('💡 Personal charity detected, using placeholder charity_id:', body.charity_id);
+                finalCharityId = 'personal-charity-placeholder'; // Use placeholder for personal charities to avoid foreign key issues
               }
             }
 
