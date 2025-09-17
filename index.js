@@ -1,10 +1,10 @@
 /**
- * Charity Tracker API - ULTIMATE SESSION FIX
- * Version: v2.1.7 - ERROR HANDLING FIX
+ * Charity Tracker API - DONATIONS FIX & VERSIONING
+ * Version: v2.2.0 - DONATIONS API FIX & PROPER VERSIONING
  */
 
-const VERSION = 'v2.6.6';
-const BUILD = '2025.01.17-SUBMIT-APPROVAL-API';
+const VERSION = 'v2.2.0';
+const BUILD = '2025.09.17-DONATIONS-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
