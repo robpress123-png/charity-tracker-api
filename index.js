@@ -178,20 +178,15 @@ export default {
 
           console.log('✅ Created user_charities table');
 
-          // Check if donations table needs to allow NULL charity_id for personal charities
+          // Ensure 'personal-charity' placeholder exists in master charities for foreign key compatibility
           try {
-            // First, check if we can insert a test record with NULL charity_id
             await env.DB.prepare(`
-              INSERT INTO donations (id, user_id, charity_id, charity_name, tax_deductible_amount, type, date, created_at, updated_at)
-              VALUES ('test-null-charity', 'test-user', NULL, 'Test Personal Charity', 100, 'money', '2025-01-01', datetime('now'), datetime('now'))
+              INSERT OR IGNORE INTO charities (id, name, ein, is_verified, verification_date)
+              VALUES ('personal-charity', 'Personal Charity Placeholder', NULL, 0, NULL)
             `).run();
-
-            // If successful, clean up the test record
-            await env.DB.prepare(`DELETE FROM donations WHERE id = 'test-null-charity'`).run();
-            console.log('✅ Donations table already supports NULL charity_id');
-          } catch (nullTestError) {
-            console.log('⚠️ Donations table does not support NULL charity_id:', nullTestError.message);
-            console.log('💡 Note: Personal charity donations may need schema modification to support NULL charity_id');
+            console.log('✅ Personal charity placeholder added to master charities table');
+          } catch (placeholderError) {
+            console.log('⚠️ Could not add personal charity placeholder:', placeholderError.message);
           }
 
           console.log('✅ Database migration completed successfully');
@@ -746,8 +741,8 @@ export default {
             if (body.charity_id && body.charity_id !== 'charity-manual-entry') {
               // Check if this is a personal charity (starts with '109' for our numeric range)
               if (String(body.charity_id).startsWith('109')) {
-                console.log('💡 Personal charity detected, using NULL charity_id for foreign key compatibility:', body.charity_id);
-                finalCharityId = null; // Use NULL for personal charities to avoid foreign key constraint
+                console.log('💡 Personal charity detected, using special placeholder for foreign key compatibility:', body.charity_id);
+                finalCharityId = 'personal-charity'; // Use special placeholder for personal charities
               } else {
                 console.log('💡 Using master charity_id directly:', body.charity_id);
               }
