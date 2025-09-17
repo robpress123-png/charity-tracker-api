@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.6.2';
-const BUILD = '2025.01.17-REGISTRATION-FIX';
+const VERSION = 'v2.6.3';
+const BUILD = '2025.01.17-USER-CHARITIES-TABLE';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -129,7 +129,36 @@ export default {
             ALTER TABLE users ADD COLUMN trial_end_date TEXT
           `).run();
 
-          console.log('✅ Database migration completed successfully');
+          // Create user_charities table for personal charity management
+          await env.DB.prepare(`
+            CREATE TABLE IF NOT EXISTS user_charities (
+              id TEXT PRIMARY KEY DEFAULT (hex(randomblob(16))),
+              user_id TEXT NOT NULL,
+              name TEXT NOT NULL,
+              ein TEXT,
+              address TEXT,
+              city TEXT,
+              state TEXT,
+              zip_code TEXT,
+              website TEXT,
+              phone TEXT,
+              accepts_cash BOOLEAN DEFAULT TRUE,
+              accepts_mileage BOOLEAN DEFAULT FALSE,
+              accepts_stock BOOLEAN DEFAULT FALSE,
+              accepts_crypto BOOLEAN DEFAULT FALSE,
+              accepts_items BOOLEAN DEFAULT FALSE,
+              review_status TEXT DEFAULT 'pending',
+              reviewed_by TEXT,
+              reviewed_at TEXT,
+              review_notes TEXT,
+              master_charity_id TEXT,
+              created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+              updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+          `).run();
+
+          console.log('✅ Database migration completed successfully - added subscription fields and user_charities table');
 
           return new Response(JSON.stringify({
             success: true,
