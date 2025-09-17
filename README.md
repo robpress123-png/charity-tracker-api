@@ -3,7 +3,7 @@
 Backend API for the Charity Tracker application, deployed on Cloudflare Workers.
 
 ## Version: v2.1.3
-COMMIT
+COMMIT V2
 ### Features
 - User charity management
 - Personal charity creation
@@ -22,3 +22,4 @@ COMMIT
 ### Deployment
 
 This repository is connected to Cloudflare Workers for automatic deployment on push to main branch.
+
