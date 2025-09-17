@@ -1,10 +1,10 @@
 /**
- * Charity Tracker API - FINAL FIXED Authentication Version
- * Version: v2.1.6 - SESSION CREATION FIX
+ * Charity Tracker API - ULTIMATE SESSION FIX
+ * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.1.6';
-const BUILD = '2025.01.17-SESSION-FIX';
+const VERSION = 'v2.1.7';
+const BUILD = '2025.01.17-ULTIMATE-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -83,7 +83,7 @@ export default {
           version: VERSION,
           build: BUILD,
           service: 'Charity Tracker API',
-          deployment_status: 'SESSION_FIX_DEPLOYMENT',
+          deployment_status: 'ULTIMATE_FIX_DEPLOYMENT',
           timestamp: new Date().toISOString()
         }), {
           status: 200,
@@ -102,56 +102,93 @@ export default {
         if (apiPath === '/auth/login' && request.method === 'POST') {
           console.log('🔐 Login attempt received');
 
-          const body = await request.json();
-          const { email, password } = body;
+          try {
+            const body = await request.json();
+            const { email, password } = body;
 
-          if (!email || !password) {
-            return errorResponse('Email and password are required', 400);
-          }
-
-          console.log('🔍 Looking for user:', email);
-
-          // Find user
-          const user = await env.DB.prepare(`
-            SELECT id, email, is_admin, first_name, last_name
-            FROM users WHERE email = ?
-          `).bind(email.toLowerCase()).first();
-
-          if (!user) {
-            console.log('❌ User not found');
-            return errorResponse('Invalid credentials', 401);
-          }
-
-          console.log('✅ User found:', user.email);
-
-          // SIMPLIFIED PASSWORD CHECK - Accept "hello" or "password" for demo
-          if (password !== 'hello' && password !== 'password' && password !== 'test') {
-            console.log('❌ Invalid password');
-            return errorResponse('Invalid credentials', 401);
-          }
-
-          console.log('✅ Password accepted');
-
-          // Create session - FIXED: Use SQLite datetime function
-          const sessionId = crypto.randomUUID();
-
-          await env.DB.prepare(`
-            INSERT INTO user_sessions (id, user_id, expires_at)
-            VALUES (?, ?, datetime('now', '+24 hours'))
-          `).bind(sessionId, user.id).run();
-
-          console.log('✅ Session created:', sessionId);
-
-          return successResponse({
-            token: sessionId,
-            user: {
-              id: user.id,
-              email: user.email,
-              is_admin: user.is_admin || false,
-              firstName: user.first_name || 'User',
-              lastName: user.last_name || 'Demo'
+            if (!email || !password) {
+              return errorResponse('Email and password are required', 400);
             }
-          }, 'Login successful');
+
+            console.log('🔍 Looking for user:', email);
+
+            // Find user
+            const user = await env.DB.prepare(`
+              SELECT id, email, is_admin, first_name, last_name
+              FROM users WHERE email = ?
+            `).bind(email.toLowerCase()).first();
+
+            if (!user) {
+              console.log('❌ User not found');
+              return errorResponse('Invalid credentials', 401);
+            }
+
+            console.log('✅ User found:', user.email);
+
+            // SIMPLIFIED PASSWORD CHECK - Accept "hello" or "password" for demo
+            if (password !== 'hello' && password !== 'password' && password !== 'test') {
+              console.log('❌ Invalid password');
+              return errorResponse('Invalid credentials', 401);
+            }
+
+            console.log('✅ Password accepted');
+
+            // Create session - ULTIMATE FIX: Try multiple approaches
+            const sessionId = crypto.randomUUID();
+
+            try {
+              // Method 1: Try with string literal
+              await env.DB.prepare(`
+                INSERT INTO user_sessions (id, user_id, expires_at)
+                VALUES (?, ?, datetime('now', '+24 hours'))
+              `).bind(sessionId, user.id).run();
+
+              console.log('✅ Session created with Method 1:', sessionId);
+            } catch (sessionError1) {
+              console.log('⚠️ Method 1 failed, trying Method 2:', sessionError1.message);
+
+              try {
+                // Method 2: Try with explicit date string
+                const expiresAt = new Date();
+                expiresAt.setHours(expiresAt.getHours() + 24);
+                const isoString = expiresAt.toISOString().replace('T', ' ').replace('Z', '');
+
+                await env.DB.prepare(`
+                  INSERT INTO user_sessions (id, user_id, expires_at)
+                  VALUES (?, ?, ?)
+                `).bind(sessionId, user.id, isoString).run();
+
+                console.log('✅ Session created with Method 2:', sessionId);
+              } catch (sessionError2) {
+                console.log('⚠️ Method 2 failed, trying Method 3:', sessionError2.message);
+
+                // Method 3: Simple timestamp
+                const timestamp = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // +24 hours
+
+                await env.DB.prepare(`
+                  INSERT INTO user_sessions (id, user_id, expires_at)
+                  VALUES (?, ?, ?)
+                `).bind(sessionId, user.id, timestamp).run();
+
+                console.log('✅ Session created with Method 3:', sessionId);
+              }
+            }
+
+            return successResponse({
+              token: sessionId,
+              user: {
+                id: user.id,
+                email: user.email,
+                is_admin: user.is_admin || false,
+                firstName: user.first_name || 'User',
+                lastName: user.last_name || 'Demo'
+              }
+            }, 'Login successful');
+
+          } catch (loginError) {
+            console.error('❌ Login error:', loginError);
+            return errorResponse('Login failed: ' + loginError.message, 500);
+          }
         }
 
         if (apiPath === '/auth/register' && request.method === 'POST') {
@@ -291,14 +328,14 @@ export default {
       }
 
       // Default response
-      return new Response('🚀 SESSION FIX DEPLOYMENT v2.1.6 - Use /api/* endpoints', {
+      return new Response('🚀 ULTIMATE FIX v2.1.7 - Use /api/* endpoints', {
         status: 200,
         headers: corsHeaders
       });
 
     } catch (error) {
       console.error('Unhandled error:', error);
-      return errorResponse('Internal Server Error', 500);
+      return errorResponse('Internal Server Error: ' + error.message, 500);
     }
   }
 };
