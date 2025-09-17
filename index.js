@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.6.1';
-const BUILD = '2025.01.17-DATABASE-MIGRATION';
+const VERSION = 'v2.6.2';
+const BUILD = '2025.01.17-REGISTRATION-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -359,14 +359,15 @@ export default {
 
           await env.DB.prepare(`
             INSERT INTO users (
-              id, email, password_hash, first_name, last_name, is_admin,
+              id, email, password_hash, first_name, last_name, name, is_admin,
               subscription_tier, subscription_status, subscription_start_date,
               subscription_end_date, payment_date
             )
-            VALUES (?, ?, ?, ?, ?, FALSE, 'premium', 'active', ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, FALSE, 'premium', 'active', ?, ?, ?)
           `).bind(
             userId, email.toLowerCase(), hashedPassword,
             firstName || 'User', lastName || 'Demo',
+            `${firstName || 'User'} ${lastName || 'Demo'}`,
             subscriptionStart, subscriptionEnd, subscriptionStart
           ).run();
 
