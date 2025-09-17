@@ -526,17 +526,16 @@ export default {
             // Also add to master charities table for foreign key compatibility
             try {
               await env.DB.prepare(`
-                INSERT OR IGNORE INTO charities (id, name, address, ein, is_verified, is_active, category)
-                VALUES (?, ?, ?, ?, 0, 1, 'personal')
+                INSERT OR IGNORE INTO charities (id, name, ein, is_verified, verification_date)
+                VALUES (?, ?, ?, 0, NULL)
               `).bind(
                 charityId,
                 name.trim(),
-                address || null,
                 ein || null
               ).run();
               console.log('✅ Personal charity added to master charities table:', charityId);
             } catch (masterError) {
-              console.log('⚠️ Could not add to master charities (table may not exist):', masterError.message);
+              console.log('⚠️ Could not add to master charities:', masterError.message);
             }
 
             createdCharity = await env.DB.prepare(`
