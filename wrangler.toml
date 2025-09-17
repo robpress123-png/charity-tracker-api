@@ -1,0 +1,21 @@
+name = "charity-tracker-api"
+main = "index.js"
+compatibility_date = "2024-08-01"
+account_id = "0914e501ff984abc88153acdea0a2c1d"
+
+[build]
+command = ""
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "charity-tracker-db"
+database_id = "6e49238f-4980-4ad9-a74d-38158cc287b5"
+
+# Environment variables
+[vars]
+ENVIRONMENT = "development"
+ENABLE_PAYMENT_ENFORCEMENT = "false"
+ENABLE_STOCK_PRICING = "true"
+ENABLE_CRYPTO_PRICING = "true"
+ENABLE_ADMIN_PANEL = "true"
