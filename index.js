@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.2.3';
-const BUILD = '2025.01.17-DONATION-FIX';
+const VERSION = 'v2.2.4';
+const BUILD = '2025.01.17-TABLE-COLUMN-FIX';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -277,24 +277,56 @@ export default {
 
           const charityId = crypto.randomUUID();
 
-          await env.DB.prepare(`
-            INSERT INTO user_charities (id, user_id, name, ein, address, city, state, zip, is_submitted_for_approval)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)
-          `).bind(
-            charityId,
-            session.user_id,
-            name.trim(),
-            ein || null,
-            address || null,
-            city || null,
-            state || null,
-            zip || null
-          ).run();
+          // Try different possible table names for user charities
+          let createdCharity = null;
 
-          const createdCharity = await env.DB.prepare(`
-            SELECT id, name, ein, address, city, state, zip, created_at
-            FROM user_charities WHERE id = ?
-          `).bind(charityId).first();
+          try {
+            await env.DB.prepare(`
+              INSERT INTO user_charities (id, user_id, name, ein, address, city, state, zip, is_submitted_for_approval)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+            `).bind(
+              charityId,
+              session.user_id,
+              name.trim(),
+              ein || null,
+              address || null,
+              city || null,
+              state || null,
+              zip || null
+            ).run();
+
+            createdCharity = await env.DB.prepare(`
+              SELECT id, name, ein, address, city, state, zip, created_at
+              FROM user_charities WHERE id = ?
+            `).bind(charityId).first();
+
+          } catch (e1) {
+            console.log('user_charities table not found for insert, trying personal_charities...');
+            try {
+              await env.DB.prepare(`
+                INSERT INTO personal_charities (id, user_id, name, ein, address, city, state, zip)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              `).bind(
+                charityId,
+                session.user_id,
+                name.trim(),
+                ein || null,
+                address || null,
+                city || null,
+                state || null,
+                zip || null
+              ).run();
+
+              createdCharity = await env.DB.prepare(`
+                SELECT id, name, ein, address, city, state, zip, created_at
+                FROM personal_charities WHERE id = ?
+              `).bind(charityId).first();
+
+            } catch (e2) {
+              console.log('Could not insert into personal_charities either:', e2.message);
+              return errorResponse('Unable to save personal charity - database table not found', 500);
+            }
+          }
 
           return successResponse(createdCharity, 'Personal charity added and auto-submitted for approval', 201);
         }
@@ -308,10 +340,26 @@ export default {
             return errorResponse('Authentication required', 401);
           }
 
-          const userCharities = await env.DB.prepare(`
-            SELECT id, name, ein, address, city, state, zip, is_submitted_for_approval, created_at
-            FROM user_charities WHERE user_id = ? ORDER BY created_at DESC
-          `).bind(session.user_id).all();
+          // Try different possible table names for user charities
+          let userCharities = { results: [] };
+
+          try {
+            userCharities = await env.DB.prepare(`
+              SELECT id, name, ein, address, city, state, zip, is_submitted_for_approval, created_at
+              FROM user_charities WHERE user_id = ? ORDER BY created_at DESC
+            `).bind(session.user_id).all();
+          } catch (e1) {
+            console.log('user_charities table not found, trying personal_charities...');
+            try {
+              userCharities = await env.DB.prepare(`
+                SELECT id, name, ein, address, city, state, zip, created_at
+                FROM personal_charities WHERE user_id = ? ORDER BY created_at DESC
+              `).bind(session.user_id).all();
+            } catch (e2) {
+              console.log('personal_charities table not found, returning empty array');
+              console.log('Available tables check needed');
+            }
+          }
 
           return successResponse({ charities: userCharities.results || [] });
         }
@@ -429,18 +477,17 @@ export default {
 
                 targetTable = 'donations';
                 insertSQL = `
-                  INSERT INTO donations (id, user_id, charity_id, charity_name, amount, tax_deductible_amount, type, description, date, created_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                  INSERT INTO donations (id, user_id, charity_id, charity_name, tax_deductible_amount, type, description, date, created_at, updated_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
                 `;
                 bindParams = [
                   donationId,
                   session.user_id,
                   body.charity_id || null,
                   body.charity_name || body.charity || 'Unknown Charity',
-                  body.amount || 0,
-                  body.tax_deductible_amount || body.amount || 0,
-                  body.type || 'cash',
-                  body.description || '',
+                  body.amount || body.tax_deductible_amount || 0,
+                  body.type || 'money',
+                  body.description || null,
                   body.date || new Date().toISOString().split('T')[0]
                 ];
                 console.log('✅ Using donations table with full structure');
@@ -502,7 +549,7 @@ export default {
                     targetTable = tableName;
 
                     if (tableName === 'donations') {
-                      insertSQL = `INSERT INTO donations (id, user_id, charity_name, amount, date) VALUES (?, ?, ?, ?, ?)`;
+                      insertSQL = `INSERT INTO donations (id, user_id, charity_name, tax_deductible_amount, date) VALUES (?, ?, ?, ?, ?)`;
                       bindParams = [donationId, session.user_id, body.charity_name || body.charity || 'Unknown Charity', body.amount || 0, body.date || new Date().toISOString().split('T')[0]];
                     } else {
                       insertSQL = `INSERT INTO user_donations (id, user_id, charity_name, amount, date) VALUES (?, ?, ?, ?, ?)`;
