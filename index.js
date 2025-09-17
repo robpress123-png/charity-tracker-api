@@ -3,8 +3,8 @@
  * Version: v2.1.7 - ERROR HANDLING FIX
  */
 
-const VERSION = 'v2.6.3';
-const BUILD = '2025.01.17-USER-CHARITIES-TABLE';
+const VERSION = 'v2.6.4';
+const BUILD = '2025.01.17-SAFE-MIGRATION';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -102,32 +102,50 @@ export default {
       // Database migration endpoint (admin only)
       if (pathname === '/migrate' && url.searchParams.get('admin') === 'true') {
         try {
-          console.log('🔧 Running database migration for subscription fields...');
+          console.log('🔧 Running database migration...');
 
-          // Add subscription columns to users table
-          await env.DB.prepare(`
-            ALTER TABLE users ADD COLUMN subscription_tier TEXT DEFAULT 'free'
-          `).run();
+          // Try to add subscription columns (ignore if they already exist)
+          try {
+            await env.DB.prepare(`ALTER TABLE users ADD COLUMN subscription_tier TEXT DEFAULT 'free'`).run();
+            console.log('✅ Added subscription_tier column');
+          } catch (e) {
+            console.log('ℹ️ subscription_tier column already exists');
+          }
 
-          await env.DB.prepare(`
-            ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'
-          `).run();
+          try {
+            await env.DB.prepare(`ALTER TABLE users ADD COLUMN subscription_status TEXT DEFAULT 'active'`).run();
+            console.log('✅ Added subscription_status column');
+          } catch (e) {
+            console.log('ℹ️ subscription_status column already exists');
+          }
 
-          await env.DB.prepare(`
-            ALTER TABLE users ADD COLUMN subscription_start_date TEXT
-          `).run();
+          try {
+            await env.DB.prepare(`ALTER TABLE users ADD COLUMN subscription_start_date TEXT`).run();
+            console.log('✅ Added subscription_start_date column');
+          } catch (e) {
+            console.log('ℹ️ subscription_start_date column already exists');
+          }
 
-          await env.DB.prepare(`
-            ALTER TABLE users ADD COLUMN subscription_end_date TEXT
-          `).run();
+          try {
+            await env.DB.prepare(`ALTER TABLE users ADD COLUMN subscription_end_date TEXT`).run();
+            console.log('✅ Added subscription_end_date column');
+          } catch (e) {
+            console.log('ℹ️ subscription_end_date column already exists');
+          }
 
-          await env.DB.prepare(`
-            ALTER TABLE users ADD COLUMN payment_date TEXT
-          `).run();
+          try {
+            await env.DB.prepare(`ALTER TABLE users ADD COLUMN payment_date TEXT`).run();
+            console.log('✅ Added payment_date column');
+          } catch (e) {
+            console.log('ℹ️ payment_date column already exists');
+          }
 
-          await env.DB.prepare(`
-            ALTER TABLE users ADD COLUMN trial_end_date TEXT
-          `).run();
+          try {
+            await env.DB.prepare(`ALTER TABLE users ADD COLUMN trial_end_date TEXT`).run();
+            console.log('✅ Added trial_end_date column');
+          } catch (e) {
+            console.log('ℹ️ trial_end_date column already exists');
+          }
 
           // Create user_charities table for personal charity management
           await env.DB.prepare(`
@@ -158,7 +176,8 @@ export default {
             )
           `).run();
 
-          console.log('✅ Database migration completed successfully - added subscription fields and user_charities table');
+          console.log('✅ Created user_charities table');
+          console.log('✅ Database migration completed successfully');
 
           return new Response(JSON.stringify({
             success: true,
