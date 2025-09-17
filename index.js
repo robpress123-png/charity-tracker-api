@@ -488,13 +488,22 @@ export default {
             return errorResponse('Charity name is required', 400);
           }
 
-          // Generate P-series ID for personal charities (P1, P2, P3, etc.)
-          const existingCount = await env.DB.prepare(`
-            SELECT COUNT(*) as count FROM user_charities WHERE id LIKE 'P%'
-          `).first();
+          // Generate user-specific numeric ID range for personal charities
+          // Each user gets 500 slots: User1=1000001-1000500, User2=1001001-1001500, etc.
+          const userNumericId = parseInt(session.user_id.replace(/[^0-9]/g, '')) || 1;
+          const userBaseId = 1000000 + (userNumericId * 1000);
 
-          const nextNumber = (existingCount?.count || 0) + 1;
-          const charityId = `P${nextNumber}`;
+          const existingCount = await env.DB.prepare(`
+            SELECT COUNT(*) as count FROM user_charities WHERE user_id = ?
+          `).bind(session.user_id).first();
+
+          const userCharityNumber = (existingCount?.count || 0) + 1;
+
+          if (userCharityNumber > 500) {
+            return errorResponse('Maximum of 500 personal charities per user reached', 400);
+          }
+
+          const charityId = String(userBaseId + userCharityNumber);
 
           // Try different possible table names for user charities
           let createdCharity = null;
