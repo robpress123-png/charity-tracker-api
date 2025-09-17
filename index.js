@@ -260,7 +260,7 @@ export default {
       if (pathname === '/version') {
         return new Response(JSON.stringify({
           version: API_VERSION,
-          build: BUILD,
+          build: API_BUILD,
           service: 'Charity Tracker API',
           deployment_status: 'ULTIMATE_FIX_DEPLOYMENT',
           timestamp: new Date().toISOString()
@@ -640,7 +640,7 @@ export default {
             charities: charities.results || [],
             backend_version: {
               version: API_VERSION,
-              build: BUILD,
+              build: API_BUILD,
               service: 'Charity Tracker API'
             }
           });
